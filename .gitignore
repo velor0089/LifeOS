@@ -1,0 +1,52 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Dependencies and generated build output
+node_modules/
+dist/
+
+# Local backups and temporary scripts
+*.backup
+*.diagnostic-backup
+*.1359-backup
+add_gym_profile.py
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Local operating-system files
+.DS_Store
+
+# Historical source backups
+src/*.before-*
+src/*.safe-backup
+src/*.pre-persistence-backup
+
+# Additional page backups
+src/pages/*.before-*
+src/pages/*.safe-backup
+src/pages/*.pre-persistence-backup
