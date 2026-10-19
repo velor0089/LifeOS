@@ -3897,3 +3897,54 @@ footer {
   font-size: 0.9rem;
   opacity: 0.8;
 }
+
+/* Gym workout history action buttons */
+.gym-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.gym-history-actions button {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.gym-history-actions button:first-child {
+  background: #eee7ff;
+  border-color: #d9c9ff;
+  color: #6941c6;
+}
+
+.gym-history-actions button:last-child {
+  background: #fff0f0;
+  border-color: #ffd4d4;
+  color: #c2414b;
+}
+
+.gym-history-actions button:active {
+  transform: scale(0.97);
+}
+
+.gym-history-actions button:focus-visible {
+  outline: 3px solid #a78bfa;
+  outline-offset: 3px;
+}
+
+@media (max-width: 420px) {
+  .gym-history-actions {
+    gap: 8px;
+  }
+
+  .gym-history-actions button {
+    flex: 1 1 auto;
+    padding: 10px 12px;
+  }
+}

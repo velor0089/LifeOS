@@ -222,6 +222,26 @@ const exercises = [
 
 export default function Gym({ onBack }) {
   const [page, setPage] = useState("dashboard");
+  const [pageHistory, setPageHistory] = useState([]);
+
+  function navigateTo(nextPage) {
+    setPageHistory((previous) => [...previous, page]);
+    setMessage("");
+    setPage(nextPage);
+  }
+
+  function goBack() {
+    if (pageHistory.length > 0) {
+      const previousPage = pageHistory[pageHistory.length - 1];
+      setPageHistory((previous) => previous.slice(0, -1));
+      setMessage("");
+      setPage(previousPage);
+    } else if (page !== "dashboard") {
+      setPage("dashboard");
+    } else if (onBack) {
+      onBack();
+    }
+  }
   const [goal, setGoal] = useState(() => {
     try {
       return localStorage.getItem("lifeos_gym_goal") || "Muscle Building";
@@ -374,7 +394,7 @@ function updateTrainingProfile(field, value) {
         sets: [{ reps: "10", weight: "0" }],
       },
     ]);
-    setPage("library");
+    openPage("library");
     setSelectedExercise(null);
     setMessage(`${exercise.name} added to your workout.`);
   }
@@ -496,6 +516,8 @@ function updateTrainingProfile(field, value) {
 
   function openPage(nextPage) {
     setMessage("");
+    if (nextPage === page) return;
+    setPageHistory((previous) => [...previous, page]);
     setPage(nextPage);
   }
 
@@ -513,7 +535,7 @@ function updateTrainingProfile(field, value) {
       })),
     });
     setMessage("");
-    setPage("editHistory");
+    openPage("editHistory");
   }
 
   function updateEditingDuration(value) {
@@ -622,14 +644,14 @@ function updateTrainingProfile(field, value) {
     setEditingWorkoutId(null);
     setEditingWorkout(null);
     setMessage("Workout updated.");
-    setPage("history");
+    openPage("history");
   }
 
   function cancelEditingWorkout() {
     setEditingWorkoutId(null);
     setEditingWorkout(null);
     setMessage("");
-    setPage("history");
+    openPage("history");
   }
 
   function deleteWorkout(item) {
@@ -645,7 +667,7 @@ function updateTrainingProfile(field, value) {
   function Header({ title, subtitle }) {
     return (
       <header className="gym-page-header">
-        <button className="gym-back" onClick={() => page === "dashboard" ? onBack() : openPage("dashboard")}>
+        <button className="gym-back" onClick={goBack}>
           <ArrowLeft size={21} />
         </button>
         <div>
