@@ -289,6 +289,8 @@ function updateTrainingProfile(field, value) {
   }, [history]);
   const [duration, setDuration] = useState("45");
   const [message, setMessage] = useState("");
+  const [editingWorkoutId, setEditingWorkoutId] = useState(null);
+  const [editingWorkout, setEditingWorkout] = useState(null);
 
   function toggleMuscleGroup(group) {
     setSelectedMuscles((previous) => {
@@ -358,6 +360,12 @@ function updateTrainingProfile(field, value) {
   });
 
   function addExercise(exercise) {
+    if (workout.some((item) => item.name === exercise.name)) {
+      setMessage(`${exercise.name} is already in your workout.`);
+      setSelectedExercise(null);
+      return;
+    }
+
     setWorkout((previous) => [
       ...previous,
       {
@@ -366,7 +374,16 @@ function updateTrainingProfile(field, value) {
         sets: [{ reps: "10", weight: "0" }],
       },
     ]);
-    setPage("workout");
+    setPage("library");
+    setSelectedExercise(null);
+    setMessage(`${exercise.name} added to your workout.`);
+  }
+
+  function removeExerciseFromWorkout(exerciseName) {
+    setWorkout((previous) =>
+      previous.filter((item) => item.name !== exerciseName)
+    );
+    setMessage(`${exerciseName} removed from your workout.`);
     setSelectedExercise(null);
   }
 
@@ -404,16 +421,74 @@ function updateTrainingProfile(field, value) {
       return;
     }
 
-    setHistory((previous) => [
-      {
-        id: Date.now(),
-        date: new Date().toLocaleDateString(),
-        duration,
-        exercises: workout,
-      },
-      ...previous,
-    ]);
+    const durationMinutes = Number(duration);
 
+    if (
+      typeof duration !== "string" ||
+      !duration.trim() ||
+      !Number.isFinite(durationMinutes) ||
+      !Number.isInteger(durationMinutes) ||
+      durationMinutes < 1 ||
+      durationMinutes > 1440
+    ) {
+      setMessage("Enter a whole-number workout duration between 1 and 1440 minutes.");
+      return;
+    }
+
+    for (const exercise of workout) {
+      if (
+        !exercise ||
+        typeof exercise.name !== "string" ||
+        !exercise.name.trim() ||
+        !Array.isArray(exercise.sets) ||
+        exercise.sets.length === 0
+      ) {
+        setMessage("Each exercise must have a name and at least one valid set.");
+        return;
+      }
+
+      for (const set of exercise.sets) {
+        const reps = Number(set?.reps);
+        const weight = Number(set?.weight);
+
+        if (
+          set?.reps === "" ||
+          set?.reps == null ||
+          !Number.isInteger(reps) ||
+          reps < 1 ||
+          reps > 1000
+        ) {
+          setMessage("Repetitions must be a whole number between 1 and 1000.");
+          return;
+        }
+
+        if (
+          set?.weight === "" ||
+          set?.weight == null ||
+          !Number.isFinite(weight) ||
+          weight < 0 ||
+          weight > 10000
+        ) {
+          setMessage("Weight must be between 0 and 10000 kg.");
+          return;
+        }
+      }
+    }
+
+    const completedWorkout = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString(),
+      duration: durationMinutes,
+      exercises: workout.map((exercise) => ({
+        ...exercise,
+        sets: exercise.sets.map((set) => ({
+          reps: Number(set.reps),
+          weight: Number(set.weight),
+        })),
+      })),
+    };
+
+    setHistory((previous) => [completedWorkout, ...previous]);
     setWorkout([]);
     setMessage("Workout saved for this session!");
     setPage("dashboard");
@@ -422,6 +497,149 @@ function updateTrainingProfile(field, value) {
   function openPage(nextPage) {
     setMessage("");
     setPage(nextPage);
+  }
+
+  function startEditingWorkout(item) {
+    setEditingWorkoutId(item.id);
+    setEditingWorkout({
+      ...item,
+      duration: String(item.duration ?? "45"),
+      exercises: item.exercises.map((exercise) => ({
+        ...exercise,
+        sets: exercise.sets.map((set) => ({
+          reps: String(set.reps ?? "10"),
+          weight: String(set.weight ?? "0"),
+        })),
+      })),
+    });
+    setMessage("");
+    setPage("editHistory");
+  }
+
+  function updateEditingDuration(value) {
+    setEditingWorkout((previous) => ({ ...previous, duration: value }));
+  }
+
+  function updateEditingSet(exerciseId, index, field, value) {
+    setEditingWorkout((previous) => ({
+      ...previous,
+      exercises: previous.exercises.map((exercise) =>
+        exercise.id !== exerciseId
+          ? exercise
+          : {
+              ...exercise,
+              sets: exercise.sets.map((set, setIndex) =>
+                setIndex === index ? { ...set, [field]: value } : set
+              ),
+            }
+      ),
+    }));
+  }
+
+  function removeEditingExercise(exerciseId) {
+    setEditingWorkout((previous) => ({
+      ...previous,
+      exercises: previous.exercises.filter((exercise) => exercise.id !== exerciseId),
+    }));
+  }
+
+  function addEditingSet(exerciseId) {
+    setEditingWorkout((previous) => ({
+      ...previous,
+      exercises: previous.exercises.map((exercise) =>
+        exercise.id !== exerciseId
+          ? exercise
+          : {
+              ...exercise,
+              sets: [...exercise.sets, { reps: "10", weight: "0" }],
+            }
+      ),
+    }));
+  }
+
+  function saveEditedWorkout() {
+    if (!editingWorkout || !editingWorkout.exercises.length) {
+      setMessage("Keep at least one exercise in the workout.");
+      return;
+    }
+
+    const durationMinutes = Number(editingWorkout.duration);
+    if (
+      !String(editingWorkout.duration).trim() ||
+      !Number.isInteger(durationMinutes) ||
+      durationMinutes < 1 ||
+      durationMinutes > 1440
+    ) {
+      setMessage("Duration must be a whole number between 1 and 1440 minutes.");
+      return;
+    }
+
+    for (const exercise of editingWorkout.exercises) {
+      if (!exercise.name?.trim() || !exercise.sets?.length) {
+        setMessage("Each exercise needs a name and at least one set.");
+        return;
+      }
+
+      for (const set of exercise.sets) {
+        const reps = Number(set.reps);
+        const weight = Number(set.weight);
+        if (
+          String(set.reps).trim() === "" ||
+          !Number.isInteger(reps) ||
+          reps < 1 ||
+          reps > 1000
+        ) {
+          setMessage("Repetitions must be a whole number between 1 and 1000.");
+          return;
+        }
+        if (
+          String(set.weight).trim() === "" ||
+          !Number.isFinite(weight) ||
+          weight < 0 ||
+          weight > 10000
+        ) {
+          setMessage("Weight must be between 0 and 10000 kg.");
+          return;
+        }
+      }
+    }
+
+    const savedWorkout = {
+      ...editingWorkout,
+      duration: durationMinutes,
+      exercises: editingWorkout.exercises.map((exercise) => ({
+        ...exercise,
+        sets: exercise.sets.map((set) => ({
+          reps: Number(set.reps),
+          weight: Number(set.weight),
+        })),
+      })),
+    };
+
+    setHistory((previous) =>
+      previous.map((item) => item.id === editingWorkoutId ? savedWorkout : item)
+    );
+    setEditingWorkoutId(null);
+    setEditingWorkout(null);
+    setMessage("Workout updated.");
+    setPage("history");
+  }
+
+  function cancelEditingWorkout() {
+    setEditingWorkoutId(null);
+    setEditingWorkout(null);
+    setMessage("");
+    setPage("history");
+  }
+
+  function deleteWorkout(item) {
+    const confirmed = window.confirm(
+      `Delete the workout from ${item.date}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setHistory((previous) => previous.filter((entry) => entry.id !== item.id));
+    setMessage("Workout deleted.");
   }
 
   function Header({ title, subtitle }) {
@@ -560,6 +778,18 @@ function updateTrainingProfile(field, value) {
         <>
           <Header title="Select Muscle Groups" subtitle="Choose up to 3 groups for your workout." />
 
+          <label className="gym-duration">
+            Workout duration (minutes)
+            <input
+              type="number"
+              min="1"
+              max="1440"
+              step="1"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+            />
+          </label>
+
           <div className="gym-selection-count">
             Selected: <strong>{selectedMuscles.length}/3</strong>
           </div>
@@ -621,6 +851,16 @@ function updateTrainingProfile(field, value) {
       {page === "library" && (
         <>
           <Header title="Exercise Library" subtitle={`${exercises.length} starter exercises`} />
+          {workout.length > 0 && (
+            <button
+              type="button"
+              className="primary-button gym-full-button"
+              onClick={() => openPage("workout")}
+            >
+              View Current Workout ({workout.length} {workout.length === 1 ? "exercise" : "exercises"})
+            </button>
+          )}
+          {message && <p className="gym-message" role="status">{message}</p>}
           <input className="gym-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search exercises..." />
           <div className="gym-muscle-filter">
             <button className={muscle === "All" ? "selected" : ""} onClick={() => setMuscle("All")}>All</button>
@@ -629,13 +869,26 @@ function updateTrainingProfile(field, value) {
             ))}
           </div>
           <section className="gym-exercise-list">
-            {recommendedExercises.map((exercise) => (
-              <button key={exercise.name} onClick={() => setSelectedExercise(exercise)}>
-                <span className="exercise-mini-icon"><Dumbbell size={20} /></span>
-                <span><strong>{exercise.name}</strong><small>{exercise.muscle} · {exercise.equipment}</small></span>
-                <ChevronRight size={18} />
-              </button>
-            ))}
+            {recommendedExercises.map((exercise) => {
+              const isSelected = workout.some((item) => item.name === exercise.name);
+
+              return (
+                <button
+                  key={exercise.name}
+                  onClick={() => setSelectedExercise(exercise)}
+                  aria-label={`${exercise.name}${isSelected ? ", already added" : ", not added"}`}
+                >
+                  <span className="exercise-mini-icon"><Dumbbell size={20} /></span>
+                  <span>
+                    <strong>{exercise.name}</strong>
+                    <small>{exercise.muscle} · {exercise.equipment}</small>
+                  </span>
+                  {isSelected
+                    ? <strong aria-label="Added">✓ Added</strong>
+                    : <span aria-label="Not added">＋ Add</span>}
+                </button>
+              );
+            })}
             {!filteredExercises.length && <p>No exercises found. Try another search or muscle group.</p>}
           </section>
           {selectedExercise && (
@@ -668,7 +921,21 @@ function updateTrainingProfile(field, value) {
                 <p>Use a manageable load, breathe steadily, and keep your joints aligned. Stop if you feel sharp pain.</p>
                 <h3>Common mistakes</h3>
                 <p>Avoid swinging the weight, rushing repetitions, or using more weight than you can control.</p>
-                <button className="primary-button" onClick={() => addExercise(selectedExercise)}>Add to Workout</button>
+                {workout.some((item) => item.name === selectedExercise.name) ? (
+                  <button
+                    className="primary-button"
+                    onClick={() => removeExerciseFromWorkout(selectedExercise.name)}
+                  >
+                    Remove from Workout
+                  </button>
+                ) : (
+                  <button
+                    className="primary-button"
+                    onClick={() => addExercise(selectedExercise)}
+                  >
+                    Add to Workout
+                  </button>
+                )}
               </section>
             </div>
           )}
@@ -677,10 +944,7 @@ function updateTrainingProfile(field, value) {
 
       {page === "workout" && (
         <>
-          <Header title="Active Workout" subtitle="Record your training session." />
-          <label className="gym-duration">Workout duration (minutes)
-            <input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} />
-          </label>
+          <Header title="Active Workout" subtitle={`Record your training session · ${duration || "—"} minutes`} />
           <button className="gym-add-exercise" onClick={() => openPage("library")}><Plus size={19} /> Add Exercise</button>
           {!workout.length && <div className="empty-state"><div>🏋️</div><h3>Ready when you are</h3><p>Add exercises from the library to begin logging sets.</p><button className="primary-button" onClick={() => openPage("library")}>Browse Exercises</button></div>}
           {workout.map((exercise) => (
@@ -705,6 +969,121 @@ function updateTrainingProfile(field, value) {
         </>
       )}
 
+      {page === "editHistory" && editingWorkout && (
+        <>
+          <Header
+            title="Edit Workout"
+            subtitle={`Correct your saved session · ${editingWorkout.date}`}
+          />
+
+          <label className="gym-duration">
+            Workout duration (minutes)
+            <input
+              type="number"
+              min="1"
+              max="1440"
+              step="1"
+              value={editingWorkout.duration}
+              onChange={(e) => updateEditingDuration(e.target.value)}
+            />
+          </label>
+
+          {editingWorkout.exercises.map((exercise) => (
+            <article className="gym-log-card" key={exercise.id}>
+              <div className="gym-log-title">
+                <div>
+                  <strong>{exercise.name}</strong>
+                  <small>{exercise.muscle} · {exercise.equipment}</small>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeEditingExercise(exercise.id)}
+                  aria-label={`Remove ${exercise.name}`}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="gym-set-heading">
+                <span>SET</span><span>REPS</span><span>WEIGHT (KG)</span><span />
+              </div>
+
+              {exercise.sets.map((set, index) => (
+                <div className="gym-set-row" key={index}>
+                  <span>{index + 1}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    step="1"
+                    aria-label={`${exercise.name} set ${index + 1} repetitions`}
+                    value={set.reps}
+                    onChange={(e) =>
+                      updateEditingSet(exercise.id, index, "reps", e.target.value)
+                    }
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="10000"
+                    step="0.5"
+                    aria-label={`${exercise.name} set ${index + 1} weight`}
+                    value={set.weight}
+                    onChange={(e) =>
+                      updateEditingSet(exercise.id, index, "weight", e.target.value)
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingWorkout((previous) => ({
+                        ...previous,
+                        exercises: previous.exercises.map((item) =>
+                          item.id !== exercise.id
+                            ? item
+                            : {
+                                ...item,
+                                sets: item.sets.filter((_, i) => i !== index),
+                              }
+                        ),
+                      }))
+                    }
+                    aria-label={`Remove set ${index + 1}`}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                className="gym-add-set"
+                onClick={() => addEditingSet(exercise.id)}
+              >
+                <Plus size={16} /> Add Set
+              </button>
+            </article>
+          ))}
+
+          {message && <p className="gym-message" role="alert">{message}</p>}
+
+          <button
+            type="button"
+            className="primary-button gym-full-button"
+            onClick={saveEditedWorkout}
+          >
+            Save Changes
+          </button>
+          <button
+            type="button"
+            className="gym-full-button"
+            onClick={cancelEditingWorkout}
+          >
+            Cancel
+          </button>
+        </>
+      )}
+
       {page === "history" && (
         <>
           <Header title="Workout History" subtitle="Your completed sessions." />
@@ -712,7 +1091,23 @@ function updateTrainingProfile(field, value) {
           {history.map((item) => (
             <article className="gym-history-card" key={item.id}>
               <div className="gym-history-icon"><Dumbbell /></div>
-              <div><strong>{item.date}</strong><p>{item.exercises.length} exercises · {item.duration} minutes</p><small>{item.exercises.map(e => e.name).join(", ")}</small></div>
+              <div>
+                <strong>{item.date}</strong>
+                <p>{item.exercises.length} exercises · {item.duration} minutes</p>
+                <small>{item.exercises.map((e) => e.name).join(", ")}</small>
+                <div className="gym-history-actions">
+                  <button type="button" onClick={() => startEditingWorkout(item)}>
+                    Edit Workout
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteWorkout(item)}
+                    aria-label={`Delete workout from ${item.date}`}
+                  >
+                    Delete Workout
+                  </button>
+                </div>
+              </div>
             </article>
           ))}
         </>
